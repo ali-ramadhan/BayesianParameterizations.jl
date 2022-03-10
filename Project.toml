@@ -1,0 +1,4 @@
+name = "BayesianParameterizations"
+uuid = "5f8709a4-b0f8-4966-b6b1-6a8f5a387261"
+authors = ["ali-ramadhan <ali.hh.ramadhan@gmail.com>"]
+version = "0.1.0"
