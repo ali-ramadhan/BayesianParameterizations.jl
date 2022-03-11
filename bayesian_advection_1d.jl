@@ -113,19 +113,35 @@ end
 
 stat_model = probabilistic_advection(ϕ_correct, prob)
 
-sampler = MH(:u => x -> Normal(x, 0.05), :σ => x -> Normal(x, 1e-3))
-# sampler = HMC(1e-2, 64)
+# sampler = MH(:u => x -> Normal(x, 0.05), :σ => x -> Normal(x, 5e-3))
+sampler = HMC(1e-3, 512)
 # sampler = NUTS(0.65, max_depth=10)
 # sampler = DynamicNUTS()
 # sampler = HMCDA(10, 0.65, 0.3)
 
 θ₀ = [0.01, 0.2] # Use with the init_params=θ₀ kwarg.
 
-n_samples = 100000
+n_samples = 10000
 loss_history = zeros(n_samples)
-chain = sample(stat_model, sampler, n_samples, progress=true; callback, loss_history)
+# chain = sample(stat_model, sampler, n_samples, progress=true; callback, loss_history)
 # chain = sample(stat_model, sampler, n_samples, progress=true, init_params=θ₀; callback, loss_history)
-# chain = sample(stat_model, HMC(0.01, 10), MCMCThreads(), 1000, 3; callback)
+
+function callback(rng, model, sampler, sample, state, iter; loss_history, kwargs...)
+    n = Threads.threadid()
+
+    u = sample.θ.u[1][1]
+    σ = sample.θ.σ[1][1]
+
+    prediction = Array(predict_advection(prob, u))[1+Hx:Nx+Hx, :]
+    loss_history[n, iter] = loss = mean((prediction .- ϕ_correct).^2)
+
+    @info "Chain $n, Iteration $iter: u=$u, σ=$σ, ℒ=$loss"
+end
+
+n_chains = 8
+n_samples = 1000
+loss_history = zeros(n_chains, n_samples)
+chains = sample(stat_model, sampler, MCMCThreads(), n_samples, n_chains, progress=true; callback, loss_history)
 
 # q = vi(stat_model, ADVI(100, 1000))
 
