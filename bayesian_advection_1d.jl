@@ -4,6 +4,7 @@ using Printf
 using OffsetArrays
 using DifferentialEquations
 using Turing
+using DynamicHMC
 using CairoMakie
 
 # Turing.setadbackend(:forwarddiff)
@@ -72,7 +73,7 @@ end
 
 ϕ = Array(sol)[Hx+1:Nx+Hx, :]
 ϕ_correct = ϕ_exact.(xC, sol.t', Lx, u)
-ϕ_correct = @. ϕ_correct + 1e-2 * randn()
+# ϕ_correct = @. ϕ_correct + 1e-2 * randn()
 animate_advection(ϕ, ϕ_correct, xC, sol.t)
 
 function predict_advection(prob, u)
@@ -88,8 +89,8 @@ function predict_advection(prob, u)
 end
 
 @model function probabilistic_advection(data, prob)
-    σ ~ Exponential(0.05)
-    u ~ Normal(0.2, 0.05)
+    σ ~ truncated(Exponential(0.05), 0, 0.1)
+    u ~ truncated(Normal(0.2, 0.05), 0, 0.5)
 
     prediction = predict_advection(prob, u)
 
@@ -112,15 +113,27 @@ end
 
 stat_model = probabilistic_advection(ϕ_correct, prob)
 
-sampler = MH(:u => x -> Normal(x, 1e-2), :σ => x -> Normal(x, 1e-3))
-# ϵ, τ = 5e-2, 10
-# sampler = HMC(ϵ, τ)
-# sampler = NUTS(0.65, init_ϵ=1e-2)
+sampler = MH(:u => x -> Normal(x, 0.05), :σ => x -> Normal(x, 1e-3))
+# sampler = HMC(1e-2, 64)
+# sampler = NUTS(0.65, max_depth=10)
+# sampler = DynamicNUTS()
+# sampler = HMCDA(10, 0.65, 0.3)
 
 θ₀ = [0.01, 0.2] # Use with the init_params=θ₀ kwarg.
 
-n_samples = 10000
+n_samples = 100000
 loss_history = zeros(n_samples)
 chain = sample(stat_model, sampler, n_samples, progress=true; callback, loss_history)
-
+# chain = sample(stat_model, sampler, n_samples, progress=true, init_params=θ₀; callback, loss_history)
 # chain = sample(stat_model, HMC(0.01, 10), MCMCThreads(), 1000, 3; callback)
+
+# q = vi(stat_model, ADVI(100, 1000))
+
+# N = 1001
+# losses = zeros(N)
+# us = range(-1, 1, length=N)
+# for (i, ũ) in enumerate(us)
+#     prediction = Array(predict_advection(prob, ũ))[1+Hx:Nx+Hx, :]
+#     losses[i] = mean((prediction .- ϕ_correct).^2)
+# end
+# lines(us, maximum(losses) .- losses, axis=(xlabel="u", ylabel="likelihood ~ -loss function"))
