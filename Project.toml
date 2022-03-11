@@ -2,3 +2,12 @@ name = "BayesianParameterizations"
 uuid = "5f8709a4-b0f8-4966-b6b1-6a8f5a387261"
 authors = ["ali-ramadhan <ali.hh.ramadhan@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
+[extras]
+CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
