@@ -1,3 +1,6 @@
+using Statistics
+using Printf
+
 using OffsetArrays
 using DifferentialEquations
 using Turing
@@ -69,33 +72,55 @@ end
 
 ϕ = Array(sol)[Hx+1:Nx+Hx, :]
 ϕ_correct = ϕ_exact.(xC, sol.t', Lx, u)
+ϕ_correct = @. ϕ_correct + 1e-2 * randn()
 animate_advection(ϕ, ϕ_correct, xC, sol.t)
 
-@model function probabilistic_advection(data, prob)
+function predict_advection(prob, u)
     Nx, Hx, Δx, _ = prob.p
     Nx = Int(Nx)
     Hx = Int(Hx)
 
-    σ ~ Uniform(0, 0.01)
-    u ~ Uniform(0.18, 0.22)
-
     p = [Nx, Hx, Δx, u]
     prob = remake(prob, p=p)
     prediction = solve(prob, Tsit5())
+
+    return prediction
+end
+
+@model function probabilistic_advection(data, prob)
+    σ ~ Exponential(0.05)
+    u ~ Normal(0.2, 0.05)
+
+    prediction = predict_advection(prob, u)
 
     for i = 1:length(prediction)
         data[:, i] ~ MvNormal(prediction[i][1:Nx], σ)
     end
 end
 
-stat_model = probabilistic_advection(ϕ_correct, prob)
+# prior_chain  = sample(probabilistic_advection(ϕ_correct, prob), Prior(), 1000)
 
-function callback(rng, model, sampler, sample, state, iter; kwargs...)
-    @show iter
+function callback(rng, model, sampler, sample, state, iter; loss_history, kwargs...)
+    u = sample.θ.u[1][1]
+    σ = sample.θ.σ[1][1]
+
+    prediction = Array(predict_advection(prob, u))[1+Hx:Nx+Hx, :]
+    loss_history[iter] = loss = mean((prediction .- ϕ_correct).^2)
+
+    @info "Iteration $iter: u=$u, σ=$σ, ℒ=$loss"
 end
 
-ϵ, τ = 1e-2, 100
-n_samples = 100
-chain = sample(stat_model, NUTS(0.65), n_samples, progress=true)
+stat_model = probabilistic_advection(ϕ_correct, prob)
+
+sampler = MH(:u => x -> Normal(x, 1e-2), :σ => x -> Normal(x, 1e-3))
+# ϵ, τ = 5e-2, 10
+# sampler = HMC(ϵ, τ)
+# sampler = NUTS(0.65, init_ϵ=1e-2)
+
+θ₀ = [0.01, 0.2] # Use with the init_params=θ₀ kwarg.
+
+n_samples = 10000
+loss_history = zeros(n_samples)
+chain = sample(stat_model, sampler, n_samples, progress=true; callback, loss_history)
 
 # chain = sample(stat_model, HMC(0.01, 10), MCMCThreads(), 1000, 3; callback)
