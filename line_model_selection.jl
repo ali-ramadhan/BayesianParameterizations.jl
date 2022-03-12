@@ -92,30 +92,38 @@ begin
     fig
 end
 
-@model function categorical_line_model(x, y)
+@model function categorical_model(x, y)
     N = length(x)
+
+    m ~ Normal(0, 1)
+    k ~ Normal(0, 1)
+    σl ~ Exponential(1)
+
+    a ~ Normal(0, 1)
+    b ~ Normal(0, 1)
+    c ~ Normal(0, 1)
+    σq ~ Exponential(1)
 
     pl ~ Beta(1, 1)
     M ~ Categorical([pl, 1-pl])
 
     if M == 1
-        m ~ Normal(0, 1)
-        k ~ Normal(0, 1)
-        σl ~ Exponential(1)
-
         for n in 1:N
             y[n] ~ Normal(m*x[n] + k, σl)
         end
     else
-        a ~ Normal(0, 1)
-        b ~ Normal(0, 1)
-        c ~ Normal(0, 1)
-        σq ~ Exponential(1)
-
         for n in 1:N
             y[n] ~ Normal(a*x[n]^2 + b*x[n] + c, σq)
         end
     end
 end
 
-prior_chain_categorical  = sample(categorical_line_model(x, y), Prior(), 1000)
+prior_chain_categorical  = sample(categorical_model(x, y), Prior(), 1000)
+
+function callback(rng, model, sampler, sample, state, iter; kwargs...)
+    M = sample.θ.M[1][1]
+    @info "Iteration $iter: M=$M"
+end
+
+sampler = Gibbs(PG(100, :M), NUTS(100, 0.65, :pl, :m, :k, :σl, :a, :b, :c, :σq))
+chain_categorical = sample(categorical_model(x, y), sampler, 100, progress=true; callback)
