@@ -23,15 +23,39 @@ end
 chain_linear = sample(linear_model(x, y), NUTS(0.65), 10000, progress=true)
 
 begin
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    for _ in 1:100
-        m = rand(chain_linear[:m])
-        c = rand(chain_linear[:c])
-        lines!(x, m .* x .+ c, color=(:gray, 0.25))
+    N = 1000
+    n = Observable(1)
+
+    yₚ = []
+    for i in 1:N
+        m = chain_linear[:m][i]
+        c = chain_linear[:c][i]
+        push!(yₚ, @. m * x + c)
     end
+
+    fig = Figure()
+
+    title = @lift "Iteration $($n)"
+    ax = Axis(fig[1, 1], xlabel="x", ylabel="y"; title)
+
+    n_history = 50
+    line_plots = []
+    for i in 1:n_history
+        line_plot = lines!(x, yₚ[1], color=(:gray, 0.5 * i/n_history))
+        push!(line_plots, line_plot)
+    end
+
     scatter!(x, y)
-    fig
+
+    chain_iters = 1:N
+    record(fig, "linear_model.mp4", chain_iters, framerate=30) do chain_iter
+        @info "Animating linear model: frame $chain_iter/$N"
+        n[] = chain_iter
+
+        for (i, j) in enumerate(chain_iter:-1:max(1, chain_iter-n_history+1))
+            line_plots[i][2] = yₚ[j]
+        end
+    end
 end
 
 @model function quadratic_model(x, y)
@@ -105,9 +129,8 @@ end
     σq ~ Exponential(1)
 
     pl ~ Beta(1, 1)
-    M ~ Categorical([pl, 1-pl])
 
-    if M == 1
+    if rand() < pl
         for n in 1:N
             y[n] ~ Normal(m*x[n] + k, σl)
         end
