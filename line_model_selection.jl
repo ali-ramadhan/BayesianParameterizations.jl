@@ -148,5 +148,28 @@ function callback(rng, model, sampler, sample, state, iter; kwargs...)
     @info "Iteration $iter: M=$M"
 end
 
-sampler = Gibbs(PG(100, :M), NUTS(100, 0.65, :pl, :m, :k, :σl, :a, :b, :c, :σq))
-chain_categorical = sample(categorical_model(x, y), sampler, 100, progress=true; callback)
+# sampler = Gibbs(PG(100, :M), NUTS(100, 0.65, :pl, :m, :k, :σl, :a, :b, :c, :σq))
+chain_categorical = sample(categorical_model(x, y), NUTS(max_depth=15), 10000, progress=true)
+
+begin
+    fig = Figure()
+    ax = Axis(fig[1, 1])
+
+    pl = mode(chain_categorical[:pl])
+
+    m = mode(chain_categorical[:m])
+    k = mode(chain_categorical[:k])
+
+    a = mode(chain_categorical[:a])
+    b = mode(chain_categorical[:b])
+    c = mode(chain_categorical[:c])
+
+    y_linear = @. m*x + k
+    y_quadratic = @. a*x^2 + b*x + c
+
+    lines!(x, y_linear, label=@sprintf("linear (%d%%)", 100pl))
+    lines!(x, y_quadratic, label=@sprintf("quadratic (%d%%)", 100*(1-pl)))
+
+    scatter!(x, y)
+    fig
+end
