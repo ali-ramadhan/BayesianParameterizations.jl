@@ -207,4 +207,7 @@ function plot_chains_and_densities(chains, vars; q_ADVI=nothing, n_ADVI_samples=
     return
 end
 
+plot_chains_and_densities(chains_init, [:u, :σ])
+
 # q_ADVI = vi(probabilistic_advection(ϕ_correct, prob), ADVI(100, 1000))
+# plot_chains_and_densities(chains_init, [:u, :σ]; q_ADVI)
