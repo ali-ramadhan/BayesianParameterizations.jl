@@ -102,7 +102,7 @@ function plot_likelihood(prob; saveat=0.1, N=1001, u_range=(-1, 1), chains=nothi
     end
 
     fig = Figure()
-    ax = Axis(fig[1, 1], title="Advection 1D with saveat=$saveat", xlabel="u", ylabel="likelihood ~ -loss function")
+    ax = Axis(fig[1, 1], title="Likelihood of model prediction for 1D advection with saveat=$saveat", xlabel="u", ylabel="likelihood ~ -loss (relative to max loss, arbitrary units)")
     lines!(ax, us, maximum(losses) .- losses)
 
     if !isnothing(chains)
@@ -171,6 +171,40 @@ n_chains = 8
 
 n_samples = 1000
 loss_history = zeros(n_chains, n_samples)
-chains = sample(probabilistic_advection(ϕ_correct, prob), sampler, MCMCThreads(), n_samples, n_chains, progress=true, callback=callback_multi_chain; loss_history)
 
-# q = vi(probabilistic_advection(ϕ_correct, prob), ADVI(100, 1000))
+chains_no_init = sample(probabilistic_advection(ϕ_correct, prob), sampler, MCMCThreads(), n_samples, n_chains, progress=true, callback=callback_multi_chain; loss_history)
+plot_likelihood(prob, saveat=0.1, u_range=(-1, 1.5); chains)
+
+chains_init = sample(probabilistic_advection(ϕ_correct, prob), sampler, MCMCThreads(), n_samples, n_chains, init_params=θ₀, progress=true, callback=callback_multi_chain; loss_history)
+
+function plot_chains_and_densities(chains, vars; q_ADVI=nothing, n_ADVI_samples=10000)
+    n_chains = size(chains, 3)
+
+    fig = Figure()
+
+    if !isnothing(q_ADVI)
+        ADVI_samples = rand(q_ADVI, n_ADVI_samples)
+    end
+
+    for (n, var) in enumerate(vars)
+        ax1 = Axis(fig[n, 1], ylabel="$var", xlabel="iteration")
+        for c in 1:n_chains
+            lines!(ax1, chains[var].data[:, c])
+        end
+
+        ax2 = Axis(fig[n, 2], ylabel="P($var)", xlabel="$var", yticklabelsvisible=false)
+        density!(ax2, chains[var][:].data, label="NUTS")
+
+        if !isnothing(q_ADVI)
+            density!(ax2, ADVI_samples[n, :], label="ADVI")
+        end
+
+        axislegend(ax2)
+    end
+
+    save("chains_and_densities.png", fig)
+
+    return
+end
+
+# q_ADVI = vi(probabilistic_advection(ϕ_correct, prob), ADVI(100, 1000))
