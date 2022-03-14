@@ -1,0 +1,5 @@
+linear: 15.9 seconds for 10000 samples
+quadratic: 10.4 seconds for 10000 samples
+exponential: 13.4 seconds for 10000 samples
+categorical1: 68.6 seconds for 1000 samples
+categorical2: 39.9 seconds for 1000 samples
