@@ -85,7 +85,7 @@ function plot_chains_and_densities(chain, vars; filepath)
 
     save(filepath, fig, px_per_unit=2)
 
-    return
+    return fig
 end
 
 plot_chains_and_densities(chain_linear, [:m, :c, :σ], filepath="linear_model_posteriors.png")
